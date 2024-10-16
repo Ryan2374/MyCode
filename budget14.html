@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Budget Tracker with Custom Categories and Excel Import</title>
+  <style>
+    /* General page styles */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: linear-gradient(to right, #f0f4f8, #e2e8f0);
+      color: #333;
+      position: relative; /* To position the footer correctly */
+      min-height: 100vh;   /* Ensure the footer is at the bottom */
+    }
+    h1, h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+    #balance {
+      font-size: 28px;
+      color: #2c3e50;
+      margin: 20px 0;
+    }
+
+    /* 3D button styles */
+    button {
+      background: linear-gradient(to bottom, #8e44ad, #5b2c6f);
+      border: none;
+      padding: 12px 20px;
+      color: white;
+      font-size: 16px;
+      border-radius: 6px;
+      box-shadow: 0 4px #512e5f;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+    }
+    button:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px #512e5f;
+    }
+
+    /* Transaction list styles */
+    .transactions-list {
+      list-style-type: none;
+      padding: 0;
+      margin: 20px 0;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .transactions-list li {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .transactions-list li:last-child {
+      border-bottom: none;
+    }
+
+    /* Input field and select dropdown styles */
+    input, select {
+      padding: 10px;
+      margin: 5px 0;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      width: 100%;
+      box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Category breakdown and summary */
+    .summary-section {
+      font-size: 20px;
+      font-weight: bold;
+      margin-top: 20px;
+      color: #34495e;
+    }
+    .category-summary {
+      margin-top: 20px;
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .category-summary h3 {
+      margin-bottom: 15px;
+      color: #2c3e50;
+    }
+    ul#categoryBreakdown, ul#customCategoryBreakdown {
+      list-style-type: none;
+      padding: 0;
+    }
+    ul#categoryBreakdown li, ul#customCategoryBreakdown li {
+      padding: 8px 0;
+      border-bottom: 1px solid #ddd;
+    }
+
+    /* Form section */
+    .transaction, .filter, .category-management {
+      margin-bottom: 20px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    label {
+      display: inline-block;
+      width: 120px;
+      font-weight: bold;
+      color: #34495e;
+    }
+
+    /* Color picker */
+    .color-picker {
+      padding: 10px;
+    }
+
+    /* Footer styles */
+    footer {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      font-size: 12px;
+      color: #888;
+    }
+
+  </style>
+  <!-- Include SheetJS library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<h1>Budget</h1> <!-- Header update -->
+<h2>Balance: $<span id="balance">0.00</span></h2>
+
+<!-- Form to add or edit a transaction -->
+<div class="transaction">
+  <h3 id="transactionFormTitle">Add Transaction</h3>
+  <label for="description">Description:</label>
+  <input type="text" id="description" placeholder="e.g., Salary, Groceries"><br>
+
+  <label for="amount">Amount:</label>
+  <input type="number" id="amount" placeholder="e.g., 100" step="0.01"><br>
+
+  <label for="category">Category:</label>
+  <select id="category">
+    <option value="income">Income</option>
+    <option value="groceries">Groceries</option>
+    <option value="rent">Rent</option>
+    <option value="entertainment">Entertainment</option>
+    <option value="others">Others</option>
+  </select><br>
+
+  <label for="date">Date:</label>
+  <input type="date" id="date"><br>
+
+  <button id="saveTransactionBtn" onclick="addOrEditTransaction()">Add Transaction</button>
+</div>
+
+<!-- Category Management Section -->
+<div class="category-management">
+  <h3>Manage Categories</h3>
+  <input type="text" id="newCategory" placeholder="Add new category">
+  <input type="color" id="newCategoryColor" class="color-picker" value="#2c3e50">
+  <button onclick="addCategory()">Add Category</button>
+  
+  <ul id="categoryList"></ul> <!-- List of custom categories -->
+</div>
+
+<!-- Transaction filter by date -->
+<div class="filter">
+  <h3>Filter by Date</h3>
+  <label for="startDate">From:</label>
+  <input type="date" id="startDate" class="date-field">
+  <label for="endDate">To:</label>
+  <input type="date" id="endDate" class="date-field">
+  <button onclick="filterTransactions()">Filter</button>
+</div>
+
+<!-- List of transactions -->
+<ul id="transactionList" class="transactions-list"></ul>
+
+<!-- Total Additions and Deductions -->
+<div class="summary-section">
+  <h3>Total Additions (Income): $<span id="totalIncome">0.00</span></h3>
+  <h3>Total Deductions (Expenses): $<span id="totalExpenses">0.00</span></h3>
+</div>
+
+<!-- Category breakdown -->
+<div class="category-summary">
+  <h3>Expense Breakdown</h3>
+  <ul id="categoryBreakdown">
+    <li>Groceries: $<span id="groceriesTotal">0.00</span></li>
+    <li>Rent: $<span id="rentTotal">0.00</span></li>
+    <li>Entertainment: $<span id="entertainmentTotal">0.00</span></li>
+    <li>Others: $<span id="othersTotal">0.00</span></li>
+  </ul>
+  <ul id="customCategoryBreakdown"></ul> <!-- For custom category breakdowns -->
+</div>
+
+<!-- Save, Load, and Export buttons -->
+<div>
+  <button onclick="downloadData()">Save Data to File</button>
+  <input type="file" id="fileInput" style="display:none" onchange="loadDataFromFile(event)">
+  <button onclick="document.getElementById('fileInput').click()">Load Data from File</button>
+  <input type="file" id="importFile" accept=".csv, .xlsx" onchange="importFile(event)" style="display:none">
+  <button onclick="document.getElementById('importFile').click()">Import Excel/CSV</button>
+  <button onclick="exportToExcel()">Export to Excel</button>
+</div>
+
+<!-- Footer with creator's name -->
+<footer>
+  Created By Ryan McDowell
+</footer>
+
+<script>
+  let transactions = [];
+  let categoryExpenses = { groceries: 0, rent: 0, entertainment: 0, others: 0 };
+  let customCategories = [];
+  let customCategoryExpenses = {};
+  let customCategoryColors = {};
+  let editIndex = -1;
+
+  // Function to handle importing files (CSV or Excel)
+  function importFile(event) {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        // Assuming the first sheet contains the transactions
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const importedData = XLSX.utils.sheet_to_json(sheet);
+
+        // Append the imported transactions to existing ones
+        importedData.forEach(item => {
+          const transaction = {
+            description: item.Description || item.description,
+            amount: parseFloat(item.Amount || item.amount),
+            category: item.Category || item.category,
+            date: item.Date || item.date
+          };
+          transactions.push(transaction);
+        });
+
+        // Re-render transactions and update the UI
+        renderTransactions();
+        updateBalance();
+        updateCategorySummary();
+        updateTotalIncomeAndExpenses();
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+  }
+
+  function addOrEditTransaction() {
+    const description = document.getElementById('description').value;
+    const amount = parseFloat(document.getElementById('amount').value);
+    const category = document.getElementById('category').value;
+    const date = document.getElementById('date').value;
+
+    if (!description || isNaN(amount) || !date) {
+      alert("Please fill out all fields.");
+      return;
+    }
+
+    const transaction = { description, amount, category, date };
+
+    if (editIndex === -1) {
+      transactions.push(transaction);
+    } else {
+      transactions[editIndex] = transaction;
+      editIndex = -1;
+      document.getElementById('saveTransactionBtn').innerText = 'Add Transaction';
+      document.getElementById('transactionFormTitle').innerText = 'Add Transaction';
+    }
+
+    clearInputs();
+    renderTransactions();
+    updateBalance();
+    updateCategorySummary();
+    updateTotalIncomeAndExpenses();
+  }
+
+  function editTransaction(index) {
+    const transaction = transactions[index];
+    document.getElementById('description').value = transaction.description;
+    document.getElementById('amount').value = transaction.amount;
+    document.getElementById('category').value = transaction.category;
+    document.getElementById('date').value = transaction.date;
+
+    editIndex = index;
+    document.getElementById('saveTransactionBtn').innerText = 'Save Changes';
+    document.getElementById('transactionFormTitle').innerText = 'Edit Transaction';
+  }
+
+  function deleteTransaction(index) {
+    transactions.splice(index, 1);
+    renderTransactions();
+    updateBalance();
+    updateCategorySummary();
+    updateTotalIncomeAndExpenses();
+  }
+
+  function filterTransactions() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    const filteredTransactions = transactions.filter(transaction => {
+      return (!startDate || transaction.date >= startDate) && (!endDate || transaction.date <= endDate);
+    });
+
+    renderTransactions(filteredTransactions);
+  }
+
+  function clearInputs() {
+    document.getElementById('description').value = '';
+    document.getElementById('amount').value = '';
+    document.getElementById('category').value = 'income';
+    document.getElementById('date').value = '';
+  }
+
+  function renderTransactions(filteredTransactions = transactions) {
+    const transactionList = document.getElementById('transactionList');
+    transactionList.innerHTML = '';
+
+    filteredTransactions.forEach((transaction, index) => {
+      const li = document.createElement('li');
+      const categoryColor = customCategoryColors[transaction.category] || (transaction.category === 'income' ? '#2c662d' : '#800000');
+      li.style.color = categoryColor;
+      li.innerHTML = `
+        ${transaction.date} - ${transaction.description}: $${transaction.amount.toFixed(2)} (${transaction.category})
+        <button onclick="editTransaction(${index})">Edit</button>
+        <button onclick="deleteTransaction(${index})">Delete</button>
+      `;
+      transactionList.appendChild(li);
+    });
+  }
+
+  function updateBalance() {
+    const balanceElement = document.getElementById('balance');
+    const totalIncome = transactions.filter(t => t.category === 'income').reduce((acc, t) => acc + t.amount, 0);
+    const totalExpenses = transactions.filter(t => t.category !== 'income').reduce((acc, t) => acc + t.amount, 0);
+    const balance = totalIncome - totalExpenses;
+
+    balanceElement.textContent = balance.toFixed(2);
+    balanceElement.style.color = balance < 0 ? '#800000' : '#2c662d';  // Use dark maroon or forest green
+  }
+
+  function updateCategorySummary() {
+    categoryExpenses = { groceries: 0, rent: 0, entertainment: 0, others: 0 };
+    customCategoryExpenses = {};
+
+    transactions.forEach(transaction => {
+      if (transaction.category !== 'income') {
+        if (categoryExpenses.hasOwnProperty(transaction.category)) {
+          categoryExpenses[transaction.category] += transaction.amount;
+        } else if (customCategories.includes(transaction.category)) {
+          if (!customCategoryExpenses[transaction.category]) {
+            customCategoryExpenses[transaction.category] = 0;
+          }
+          customCategoryExpenses[transaction.category] += transaction.amount;
+        }
+      }
+    });
+
+    document.getElementById('groceriesTotal').textContent = categoryExpenses.groceries.toFixed(2);
+    document.getElementById('rentTotal').textContent = categoryExpenses.rent.toFixed(2);
+    document.getElementById('entertainmentTotal').textContent = categoryExpenses.entertainment.toFixed(2);
+    document.getElementById('othersTotal').textContent = categoryExpenses.others.toFixed(2);
+
+    renderCustomCategoryBreakdown();
+  }
+
+  function renderCustomCategoryBreakdown() {
+    const customCategoryBreakdown = document.getElementById('customCategoryBreakdown');
+    customCategoryBreakdown.innerHTML = '';
+
+    customCategories.forEach(category => {
+      const amount = customCategoryExpenses[category] ? customCategoryExpenses[category].toFixed(2) : '0.00';
+      const categoryColor = customCategoryColors[category] || '#333';
+      const li = document.createElement('li');
+      li.style.color = categoryColor;
+      li.innerHTML = `${category}: $${amount}`;
+      customCategoryBreakdown.appendChild(li);
+    });
+  }
+
+  function updateTotalIncomeAndExpenses() {
+    const totalIncome = transactions.filter(t => t.category === 'income').reduce((acc, t) => acc + t.amount, 0);
+    const totalExpenses = transactions.filter(t => t.category !== 'income').reduce((acc, t) => acc + t.amount, 0);
+
+    document.getElementById('totalIncome').textContent = totalIncome.toFixed(2);
+    document.getElementById('totalExpenses').textContent = totalExpenses.toFixed(2);
+  }
+
+  function addCategory() {
+    let newCategory = document.getElementById('newCategory').value.trim();
+    let newCategoryColor = document.getElementById('newCategoryColor').value;
+
+    // Automatically capitalize the first letter of the category
+    if (newCategory) {
+        newCategory = newCategory.charAt(0).toUpperCase() + newCategory.slice(1);
+    }
+
+    // Check if the category is valid and unique
+    if (newCategory && !customCategories.includes(newCategory)) {
+        customCategories.push(newCategory);
+        customCategoryExpenses[newCategory] = 0;
+        customCategoryColors[newCategory] = newCategoryColor;
+
+        // Add new category to dropdown
+        const categoryDropdown = document.getElementById('category');
+        const option = document.createElement('option');
+        option.value = newCategory;
+        option.text = newCategory;
+        categoryDropdown.appendChild(option);
+
+        renderCategoryList();
+        document.getElementById('newCategory').value = '';  // Clear input
+    } else {
+        alert("Please enter a valid and unique category name.");
+    }
+  }
+
+  function renderCategoryList() {
+    const categoryList = document.getElementById('categoryList');
+    categoryList.innerHTML = '';  // Clear list
+
+    customCategories.forEach((category, index) => {
+      const li = document.createElement('li');
+      li.classList.add('category-item');
+      li.innerHTML = `
+        ${category} (Color: <span style="color:${customCategoryColors[category]}">${customCategoryColors[category]}</span>)
+        <button onclick="deleteCategory(${index})">Delete</button>
+      `;
+      categoryList.appendChild(li);
+    });
+  }
+
+  function deleteCategory(index) {
+    const categoryToDelete = customCategories[index];
+
+    // Remove category from dropdown
+    const categoryDropdown = document.getElementById('category');
+    for (let i = 0; i < categoryDropdown.options.length; i++) {
+      if (categoryDropdown.options[i].value === categoryToDelete) {
+        categoryDropdown.remove(i);
+        break;
+      }
+    }
+
+    // Remove category from custom categories
+    customCategories.splice(index, 1);
+    delete customCategoryExpenses[categoryToDelete];
+    delete customCategoryColors[categoryToDelete];
+
+    renderCategoryList();
+    updateCategorySummary();  // Update the expense breakdown
+  }
+
+  // Function to download data as a JSON file
+  function downloadData() {
+    const data = JSON.stringify(transactions, null, 2);  // Convert transactions to JSON string
+    const blob = new Blob([data], { type: 'application/json' });  // Create a Blob from the JSON string
+    const url = URL.createObjectURL(blob);  // Create an object URL for the Blob
+
+    // Create a temporary anchor element to trigger the download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'budget_tracker_data.json';  // Set the default file name
+    document.body.appendChild(a);
+    a.click();  // Trigger the download
+    document.body.removeChild(a);  // Remove the anchor element after download
+  }
+
+  // Function to load data from a JSON file
+  function loadDataFromFile(event) {
+    const file = event.target.files[0];  // Get the selected file
+    if (file) {
+      const reader = new FileReader();  // Create a FileReader to read the file
+
+      // Define what happens when the file is successfully read
+      reader.onload = function(e) {
+        const data = e.target.result;  // Get the file content
+        transactions = JSON.parse(data);  // Parse the JSON content and update transactions
+        renderTransactions();  // Re-render the transactions list
+        updateBalance();  // Update the balance
+        updateCategorySummary();  // Update the category summary
+        updateTotalIncomeAndExpenses();  // Update the total income and expenses
+      };
+
+      reader.readAsText(file);  // Read the file as text
+    }
+  }
+
+  // Function to export budget data to Excel with formatting
+  function exportToExcel() {
+    const workbook = XLSX.utils.book_new();  // Create a new workbook
+
+    // Format worksheet for transactions
+    const transactionsData = transactions.map(transaction => ({
+      Date: transaction.date,
+      Description: transaction.description,
+      Amount: transaction.amount,
+      Category: transaction.category
+    }));
+    const transactionsSheet = XLSX.utils.json_to_sheet(transactionsData, { header: ['Date', 'Description', 'Amount', 'Category'] });
+    XLSX.utils.book_append_sheet(workbook, transactionsSheet, "Transactions");
+
+    // Format worksheet for summary (total income and expenses)
+    const summaryData = [
+      { Category: 'Total Income', Amount: parseFloat(document.getElementById('totalIncome').textContent) },
+      { Category: 'Total Expenses', Amount: parseFloat(document.getElementById('totalExpenses').textContent) }
+    ];
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData, { header: ['Category', 'Amount'] });
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
+
+    // Format worksheet for category breakdown
+    const breakdownData = [
+      { Category: 'Groceries', Amount: parseFloat(document.getElementById('groceriesTotal').textContent) },
+      { Category: 'Rent', Amount: parseFloat(document.getElementById('rentTotal').textContent) },
+      { Category: 'Entertainment', Amount: parseFloat(document.getElementById('entertainmentTotal').textContent) },
+      { Category: 'Others', Amount: parseFloat(document.getElementById('othersTotal').textContent) }
+    ];
+    const customBreakdownData = customCategories.map(category => ({
+      Category: category,
+      Amount: customCategoryExpenses[category] ? customCategoryExpenses[category] : 0
+    }));
+    const combinedBreakdownData = [...breakdownData, ...customBreakdownData];
+    const breakdownSheet = XLSX.utils.json_to_sheet(combinedBreakdownData, { header: ['Category', 'Amount'] });
+    XLSX.utils.book_append_sheet(workbook, breakdownSheet, "Category Breakdown");
+
+    // Apply auto-sizing to columns
+    const wscols = [{ wpx: 120 }, { wpx: 200 }, { wpx: 100 }, { wpx: 100 }];
+    transactionsSheet['!cols'] = wscols;
+    summarySheet['!cols'] = wscols.slice(0, 2);
+    breakdownSheet['!cols'] = wscols.slice(0, 2);
+
+    // Export the workbook to Excel file
+    XLSX.writeFile(workbook, 'Budget_Tracker.xlsx');
+  }
+</script>
+
+</body>
+</html>
